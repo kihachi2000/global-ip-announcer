@@ -32,8 +32,7 @@ impl Dig {
 
             source
                 .chars()
-                .skip_while(|c| !is_num_or_period(c))
-                .take_while(|c| is_num_or_period(c))
+                .filter(is_num_or_period)
                 .collect()
         }
 
