@@ -12,10 +12,6 @@ async fn main() {
     let (kill_tx, kill_rx) = oneshot::channel();
     let (schedule_tx, schedule_rx) = mpsc::channel(5);
 
-    let ctrl_c_handle = spawn(async move {
-        ctrl_c::detect(kill_tx).await;
-    });
-
     let scheduler_handle = spawn(async move {
         let mut scheduler = Scheduler::new(
             std::time::Duration::from_secs(5),
@@ -25,6 +21,7 @@ async fn main() {
         scheduler.run(schedule_tx).await;
     });
 
+    ctrl_c::detect(kill_tx).await;
+
     let _ = scheduler_handle.await;
-    let _ = ctrl_c_handle.await;
 }
