@@ -1,4 +1,5 @@
 mod ctrl_c;
+mod discord_bot;
 mod dns_client;
 mod scheduler;
 
@@ -7,6 +8,7 @@ use ::tokio::spawn;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
 
+use discord_bot::DiscordBot;
 use dns_client::Dig;
 use scheduler::Scheduler;
 
@@ -36,9 +38,16 @@ async fn main() {
         client.run().await;
     });
 
-    ctrl_c::detect(kill_tx).await;
+    let token = "";
+    let discord_bot_handle = spawn(async move {
+        let mut bot = DiscordBot::new(ip_addr_rx, token).await.unwrap();
+        bot.run().await;
+    });
 
+    ctrl_c::detect(kill_tx).await;
+    let _ = discord_bot_handle.await;
     let _ = scheduler_handle.await;
     let _ = dns_client_handle.await;
+
     info!("graceful stop!!");
 }
