@@ -6,6 +6,7 @@ use ::tokio::sync::mpsc::Receiver;
 pub struct DiscordBot {
     client: Client,
     ip_addr_rx: Receiver<String>,
+    current_ip_addr: String,
 }
 
 impl DiscordBot {
@@ -18,22 +19,29 @@ impl DiscordBot {
         Ok(Self {
             client,
             ip_addr_rx,
+            current_ip_addr: "".to_owned(),
         })
     }
 
     pub async fn run(&mut self) {
         while let Some(ip_addr) = self.ip_addr_rx.recv().await {
-            let channel_id: u64 = 0;
-            let channel_id = ChannelId::new(channel_id);
+            if self.current_ip_addr != ip_addr {
+                let channel_id: u64 = 0;
+                let channel_id = ChannelId::new(channel_id);
 
-            let result = channel_id.say(
-                &self.client.http,
-                format!("Current global ip is {}", ip_addr)
-            ).await;
+                let result = channel_id.say(
+                    &self.client.http,
+                    format!("Current global ip is {}", ip_addr)
+                ).await;
 
-            match result {
-                Ok(_) => info!("Succeeded to send message to the discord server."),
-                Err(_) => info!("Failed to send message to the discord server."),
+                match result {
+                    Ok(_) => {
+                        info!("Succeeded to send message to the discord server.");
+                        self.current_ip_addr = ip_addr;
+                    },
+
+                    Err(_) => info!("Failed to send message to the discord server."),
+                }
             }
         }
     }
