@@ -1,3 +1,4 @@
+use ::log::info;
 use ::tokio::process::Command;
 use ::tokio::sync::mpsc;
 
@@ -41,8 +42,11 @@ impl Dig {
 
             if let Ok(output) = command.output().await {
                 if output.status.success() {
+                    info!("send request to the dns server.");
                     let stdout = String::from_utf8(output.stdout.clone()).unwrap();
                     let ip_addr = extract_ip_addr(stdout);
+                    info!("succeeded to receive global ip address: {}", &ip_addr);
+
                     self.addr_tx.send(ip_addr).await.unwrap();
                 }
             }

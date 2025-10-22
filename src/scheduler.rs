@@ -1,3 +1,4 @@
+use ::log::info;
 use ::std::time::Duration;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
@@ -17,6 +18,7 @@ impl Scheduler {
     }
 
     pub async fn run(&mut self, tx: mpsc::Sender<()>) {
+        info!("start {} secs interval.", self.period.as_secs());
         let mut interval = interval(self.period);
 
         loop {

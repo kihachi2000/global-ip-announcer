@@ -2,6 +2,7 @@ mod ctrl_c;
 mod dns_client;
 mod scheduler;
 
+use ::log::info;
 use ::tokio::spawn;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
@@ -11,6 +12,8 @@ use scheduler::Scheduler;
 
 #[::tokio::main]
 async fn main() {
+    ::env_logger::init();
+
     let (kill_tx, kill_rx) = oneshot::channel();
     let (schedule_tx, schedule_rx) = mpsc::channel(8);
     let (ip_addr_tx, ip_addr_rx) = mpsc::channel(8);
@@ -37,5 +40,5 @@ async fn main() {
 
     let _ = scheduler_handle.await;
     let _ = dns_client_handle.await;
-    println!("graceful!!");
+    info!("graceful stop!!");
 }
