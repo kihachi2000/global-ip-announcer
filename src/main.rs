@@ -4,6 +4,7 @@ mod dns_client;
 mod scheduler;
 
 use ::log::info;
+use ::std::env;
 use ::tokio::spawn;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
@@ -38,9 +39,11 @@ async fn main() {
         client.run().await;
     });
 
-    let token = "";
+    let discord_token = env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN should be exported.");
+    let channel_id = env::var("CHANNEL_ID").expect("CHANNEL_ID should be exported.");
+    let channel_id = channel_id.parse::<u64>().expect("CHANNEL_ID should be number.");
     let discord_bot_handle = spawn(async move {
-        let mut bot = DiscordBot::new(ip_addr_rx, token).await.unwrap();
+        let mut bot = DiscordBot::new(ip_addr_rx, &discord_token, channel_id).await.unwrap();
         bot.run().await;
     });
 
