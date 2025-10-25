@@ -1,21 +1,47 @@
 mod ctrl_c;
 mod discord_bot;
 mod dns_client;
+mod error;
 mod scheduler;
 
 use ::log::info;
 use ::std::env;
+use ::std::env::VarError;
 use ::tokio::spawn;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
 
 use discord_bot::DiscordBot;
 use dns_client::Dig;
+use error::Error;
+use error::Result;
 use scheduler::Scheduler;
 
+
+fn env_var(key: &str) -> Result<String> {
+    env::var(key)
+        .map_err(|e| {
+            match e {
+                VarError::NotPresent => Error::VarNotPresent(key.to_owned()),
+                VarError::NotUnicode(_) => Error::VarNotValid(key.to_owned()),
+            }
+        })
+}
+
+fn env_var_u64(key: &str) -> Result<u64> {
+    let parse = |value: String| -> Result<u64> {
+        value.parse().map_err(|_| Error::VarNotValid(key.to_owned()))
+    };
+
+    env_var(key).and_then(parse)
+}
+
 #[::tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     ::env_logger::init();
+    let check_frequency = env_var_u64("CHECK_FREQUENCY").unwrap_or(120);
+    let discord_token = env_var("DISCORD_TOKEN")?;
+    let channel_id = env_var_u64("CHANNEL_ID")?;
 
     let (kill_tx, kill_rx) = oneshot::channel();
     let (schedule_tx, schedule_rx) = mpsc::channel(8);
@@ -23,7 +49,7 @@ async fn main() {
 
     let scheduler_handle = spawn(async move {
         let mut scheduler = Scheduler::new(
-            std::time::Duration::from_secs(120),
+            std::time::Duration::from_secs(check_frequency),
             kill_rx,
         );
 
@@ -39,9 +65,6 @@ async fn main() {
         client.run().await;
     });
 
-    let discord_token = env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN should be exported.");
-    let channel_id = env::var("CHANNEL_ID").expect("CHANNEL_ID should be exported.");
-    let channel_id = channel_id.parse::<u64>().expect("CHANNEL_ID should be number.");
     let discord_bot_handle = spawn(async move {
         let mut bot = DiscordBot::new(ip_addr_rx, &discord_token, channel_id).await.unwrap();
         bot.run().await;
@@ -53,4 +76,5 @@ async fn main() {
     let _ = dns_client_handle.await;
 
     info!("graceful stop!!");
+    Ok(())
 }
