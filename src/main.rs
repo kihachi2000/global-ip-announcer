@@ -36,12 +36,26 @@ fn env_var_u64(key: &str) -> Result<u64> {
     env_var(key).and_then(parse)
 }
 
+fn env_var_vec_u64(key: &str) -> Result<Vec<u64>> {
+    let values = env_var(key)?;
+    let values = values
+        .split(',')
+        .flat_map(str::parse)
+        .collect::<Vec<_>>();
+    
+    if values.len() == 0 {
+        Err(Error::VarNotValid(key.to_owned()))
+    } else {
+        Ok(values)
+    }
+}
+
 #[::tokio::main]
 async fn main() -> Result<()> {
     ::env_logger::init();
     let check_frequency = env_var_u64("CHECK_FREQUENCY").unwrap_or(120);
     let discord_token = env_var("DISCORD_TOKEN")?;
-    let channel_id = env_var_u64("CHANNEL_ID")?;
+    let channel_ids = env_var_vec_u64("CHANNEL_ID")?;
 
     let (kill_tx, kill_rx) = oneshot::channel();
     let (schedule_tx, schedule_rx) = mpsc::channel(8);
@@ -66,7 +80,7 @@ async fn main() -> Result<()> {
     });
 
     let discord_bot_handle = spawn(async move {
-        let mut bot = DiscordBot::new(ip_addr_rx, &discord_token, channel_id).await.unwrap();
+        let mut bot = DiscordBot::new(ip_addr_rx, &discord_token, channel_ids).await.unwrap();
         bot.run().await;
     });
 

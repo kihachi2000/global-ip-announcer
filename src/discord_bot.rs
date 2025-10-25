@@ -5,13 +5,13 @@ use ::tokio::sync::mpsc::Receiver;
 
 pub struct DiscordBot {
     client: Client,
-    channel_id: u64,
+    channel_ids: Vec<u64>,
     ip_addr_rx: Receiver<String>,
     current_ip_addr: String,
 }
 
 impl DiscordBot {
-    pub async fn new(ip_addr_rx: Receiver<String>, token: &str, channel_id: u64) -> Result<Self, String> {
+    pub async fn new(ip_addr_rx: Receiver<String>, token: &str, channel_ids: Vec<u64>) -> Result<Self, String> {
         let intents = GatewayIntents::GUILD_MESSAGES;
         let client = Client::builder(token, intents)
             .await
@@ -19,7 +19,7 @@ impl DiscordBot {
 
         Ok(Self {
             client,
-            channel_id,
+            channel_ids,
             ip_addr_rx,
             current_ip_addr: "".to_owned(),
         })
@@ -28,21 +28,23 @@ impl DiscordBot {
     pub async fn run(&mut self) {
         while let Some(ip_addr) = self.ip_addr_rx.recv().await {
             if self.current_ip_addr != ip_addr {
-                let channel_id = ChannelId::new(self.channel_id);
+                info!("New Global IP is: {}", &ip_addr);
 
-                let result = channel_id.say(
-                    &self.client.http,
-                    format!("Current global ip is {}", ip_addr)
-                ).await;
+                for &channel_id in &self.channel_ids {
+                    let channel_id = ChannelId::new(channel_id);
 
-                match result {
-                    Ok(_) => {
-                        info!("Succeeded to send message to the discord server.");
-                        self.current_ip_addr = ip_addr;
-                    },
+                    let result = channel_id.say(
+                        &self.client.http,
+                        format!("Current global ip is {}", &ip_addr)
+                    ).await;
 
-                    Err(_) => info!("Failed to send message to the discord server."),
+                    match result {
+                        Ok(_) => info!("Succeeded to send message to {}.", &channel_id),
+                        Err(_) => info!("Failed to send message to {}.", &channel_id),
+                    }
                 }
+
+                self.current_ip_addr = ip_addr;
             }
         }
     }
