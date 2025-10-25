@@ -35,7 +35,7 @@ impl DiscordBot {
 
                     let result = channel_id.say(
                         &self.client.http,
-                        format!("Current global ip is {}", &ip_addr)
+                        format!("IP address changed. ```{}```", &ip_addr)
                     ).await;
 
                     match result {
