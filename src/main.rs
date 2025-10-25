@@ -23,7 +23,7 @@ async fn main() {
 
     let scheduler_handle = spawn(async move {
         let mut scheduler = Scheduler::new(
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_secs(120),
             kill_rx,
         );
 
