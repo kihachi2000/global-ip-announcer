@@ -1,4 +1,5 @@
 use ::log::info;
+use ::log::warn;
 use ::serenity::all::ChannelId;
 use crate::error::Error;
 use crate::error::Result;
@@ -32,7 +33,7 @@ impl Client for DiscordClient {
 
         match result {
             Ok(_) => info!("Succeeded to send message to {}.", &channel_id),
-            Err(_) => info!("Failed to send message to {}.", &channel_id),
+            Err(_) => warn!("Failed to send message to {}.", &channel_id),
         }
     }
 }

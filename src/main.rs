@@ -29,8 +29,7 @@ async fn main() -> Result<()> {
     let config = Config::from_env()?;
 
     let (kill_tx, kill_rx) = oneshot::channel();
-    let (schedule_tx, mut schedule_rx) = mpsc::channel(8);
-    let (ip_addr_tx, mut ip_addr_rx) = mpsc::channel(8);
+    let (schedule_tx, schedule_rx) = mpsc::channel(8);
 
     let scheduler_handle = spawn(async move {
         let mut scheduler = Scheduler::new(
@@ -41,40 +40,43 @@ async fn main() -> Result<()> {
         scheduler.run(schedule_tx).await;
     });
 
-    let dns_client_handle = spawn(async move {
-        let command = DigCommand::new();
-        let dig = Dig::new(command);
-
-        while let Some(_) = schedule_rx.recv().await {
-            let result = dig.get_ip_addr().await;
-
-            match result {
-                Ok(ip_addr) => {
-                    info!("succeed to get IP: {ip_addr}");
-                    ip_addr_tx.send(ip_addr).await.unwrap();
-                }
-
-                Err(dns_error) => {
-                    warn!("{dns_error}");
-                }
-            }
-        }
-    });
-
-    let discord_bot_handle = spawn(async move {
-        let client = DiscordClient::new(&config.discord_token).await.unwrap();
-        let bot = DiscordBot::new(client, config.channel_id);
-
-        while let Some(ip_addr) = ip_addr_rx.recv().await {
-            bot.send(&Message::Change(ip_addr)).await;
-        }
+    let runner_handle = spawn(async move {
+        run(config, schedule_rx).await;
     });
 
     ctrl_c::detect(kill_tx).await;
-    let _ = discord_bot_handle.await;
     let _ = scheduler_handle.await;
-    let _ = dns_client_handle.await;
+    let _ = runner_handle.await;
 
     info!("graceful stop!!");
+    Ok(())
+}
+
+async fn run(config: Config, mut schedule_rx: mpsc::Receiver<()>) {
+    let command = DigCommand::new();
+    let dig = Dig::new(command);
+
+    let client = DiscordClient::new(&config.discord_token).await.unwrap();
+    let bot = DiscordBot::new(client, config.channel_id);
+
+    while let Some(_) = schedule_rx.recv().await {
+        if let Err(e) = handle(&dig, &bot).await {
+            warn!("{e}");
+        }
+    }
+}
+
+async fn handle(
+    dns_client: &impl DnsClient,
+    discord_bot: &DiscordBot<DiscordClient>
+) -> std::result::Result<(), String> {
+    let ip_addr = dns_client
+        .get_ip_addr()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let message = Message::Change(ip_addr);
+    discord_bot.send(&message).await;
+
     Ok(())
 }

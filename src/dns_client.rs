@@ -1,3 +1,4 @@
+use ::log::info;
 use ::regex::Regex;
 use crate::error::DnsError;
 
@@ -93,6 +94,7 @@ impl<C: Command> DnsClient for Dig<C> {
             .execute()
             .await
             .map(|output| Self::drop_double_quotes(output))
+            .inspect(|ip_addr| info!("{ip_addr}"))
     }
 }
 
