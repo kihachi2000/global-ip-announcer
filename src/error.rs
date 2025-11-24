@@ -19,3 +19,12 @@ impl Error {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, ::thiserror::Error)]
+pub enum DnsError {
+    #[error("command ({0}) failed.")]
+    CommandFailed(String),
+
+    #[error("IP address ({0}) is not valid.")]
+    IpNotValid(String),
+}

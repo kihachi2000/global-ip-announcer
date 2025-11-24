@@ -7,6 +7,7 @@ mod message;
 mod scheduler;
 
 use ::log::info;
+use ::log::warn;
 use ::tokio::spawn;
 use ::tokio::sync::mpsc;
 use ::tokio::sync::oneshot;
@@ -15,6 +16,8 @@ use crate::config::Config;
 use crate::discord_bot::DiscordBot;
 use crate::discord_bot::DiscordClient;
 use crate::dns_client::Dig;
+use crate::dns_client::DigCommand;
+use crate::dns_client::DnsClient;
 use crate::error::Result;
 use crate::message::Message;
 use crate::scheduler::Scheduler;
@@ -26,7 +29,7 @@ async fn main() -> Result<()> {
     let config = Config::from_env()?;
 
     let (kill_tx, kill_rx) = oneshot::channel();
-    let (schedule_tx, schedule_rx) = mpsc::channel(8);
+    let (schedule_tx, mut schedule_rx) = mpsc::channel(8);
     let (ip_addr_tx, mut ip_addr_rx) = mpsc::channel(8);
 
     let scheduler_handle = spawn(async move {
@@ -39,12 +42,23 @@ async fn main() -> Result<()> {
     });
 
     let dns_client_handle = spawn(async move {
-        let mut client = Dig::new(
-            schedule_rx,
-            ip_addr_tx,
-        );
+        let command = DigCommand::new();
+        let dig = Dig::new(command);
 
-        client.run().await;
+        while let Some(_) = schedule_rx.recv().await {
+            let result = dig.get_ip_addr().await;
+
+            match result {
+                Ok(ip_addr) => {
+                    info!("succeed to get IP: {ip_addr}");
+                    ip_addr_tx.send(ip_addr).await.unwrap();
+                }
+
+                Err(dns_error) => {
+                    warn!("{dns_error}");
+                }
+            }
+        }
     });
 
     let discord_bot_handle = spawn(async move {

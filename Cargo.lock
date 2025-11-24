@@ -583,6 +583,7 @@ dependencies = [
  "env_logger",
  "log",
  "mockall",
+ "regex",
  "serenity",
  "thiserror 2.0.17",
  "tokio",
